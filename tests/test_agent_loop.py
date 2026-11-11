@@ -1,6 +1,6 @@
 """Runs the Gemini agent loop against a scripted fake client (no network)."""
 
-from google.genai import types
+from google.genai import errors, types
 
 from opspilot.agent import GeminiAgent
 from opspilot.audit import AuditLog
@@ -67,3 +67,30 @@ def test_tool_declarations_cover_registry(tmp_path):
     agent = GeminiAgent(orch, model="m", client=FakeClient([]))
     names = {d.name for d in agent.config.tools[0].function_declarations}
     assert names == set(orch.tools)
+
+
+class FlakyModels(FakeModels):
+    def generate_content(self, model, contents, config):
+        if model == "busy-model":
+            raise errors.ServerError(503, {"error": {"code": 503, "message": "high demand", "status": "UNAVAILABLE"}})
+        return super().generate_content(model, contents, config)
+
+
+def test_failover_to_backup_model_on_503(tmp_path, monkeypatch):
+    monkeypatch.setenv("GEMINI_FALLBACK_MODELS", "backup-model")
+    client = FakeClient([reply(types.Part(text="hi"))])
+    client.models = FlakyModels(client.models.script)
+    orch = Orchestrator(Requester("alice", "employee"), AuditLog(tmp_path / "a.jsonl"))
+    agent = GeminiAgent(orch, model="busy-model", client=client)
+    assert agent.ask("hello") == "hi"
+    assert agent.model == "backup-model"
+    assert "model_failover" in (tmp_path / "a.jsonl").read_text()
+
+
+def test_all_models_down_returns_friendly_error(tmp_path, monkeypatch):
+    monkeypatch.setenv("GEMINI_FALLBACK_MODELS", "")
+    client = FakeClient([])
+    client.models = FlakyModels([])
+    orch = Orchestrator(Requester("alice", "employee"), AuditLog(tmp_path / "a.jsonl"))
+    out = GeminiAgent(orch, model="busy-model", client=client, backoff_s=0).ask("hello")
+    assert "unavailable" in out

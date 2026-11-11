@@ -23,6 +23,7 @@ authority. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 | **Duplicate and incident clustering** | New tickets are matched against open ones, so one outage doesn't become 50 tickets |
 | **Knowledge flywheel** | Every resolution drafts a KB article for review, and the agent searches the KB first |
 | **Secrets never in context** | Password resets go out of band; the model only sees a receipt |
+| **Model failover** | If the Gemini model is overloaded, the bot rotates to backup models instead of failing |
 | **Allow-listed remediation** | Fixes come from a runbook catalog, never arbitrary shell commands |
 
 ## Quick start
@@ -36,7 +37,11 @@ export GEMINI_API_KEY=your-key   # from Google AI Studio; never commit it
 ```
 
 ```bash
-opspilot chat --user alice --role employee
+opspilot web            # browser chat UI on http://127.0.0.1:8080
+```
+
+```bash
+opspilot chat --user alice --role employee   # terminal chat
 ```
 
 Try: *"I'm locked out and my laptop says the disk is full"*, *"Give bob access to it-admins"*
@@ -56,7 +61,9 @@ opspilot heal
 opspilot audit-verify
 ```
 
-Set `GEMINI_MODEL` to choose a model (default `gemini-flash-latest`).
+Set `GEMINI_MODEL` to choose a model (default `gemini-3.5-flash`). If it is overloaded
+(429/5xx), the bot fails over through `GEMINI_FALLBACK_MODELS`
+(default `gemini-3.5-flash-lite,gemini-3.7-flash,gemini-3.8-flash`) and logs each switch.
 
 ## Tests
 
@@ -78,7 +85,8 @@ src/opspilot/
   connectors.py    identity / ITSM / endpoint / monitoring / KB (mocks + interfaces)
   audit.py         hash-chained audit log
   rollback.py      undo journal
-  cli.py           chat, heal, audit-verify
+  cli.py           chat, heal, web, audit-verify
+  web.py           browser chat UI (stdlib HTTP server) + static/index.html
 docs/
   ARCHITECTURE.md
   IMPLEMENTATION_PLAN.md

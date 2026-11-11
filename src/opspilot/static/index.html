@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpsPilot IT Support</title>
+<style>
+:root {
+  --bg: #f5f6f8; --panel: #ffffff; --ink: #1b1f24; --muted: #5d6673; --line: #dfe3e8;
+  --accent: #2457d6; --accent-ink: #ffffff; --user: #e8eefc; --ok: #1d7a46; --warn: #a15c00; --bad: #b42318;
+  --chip: #f0f2f5;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111418; --panel: #1a1f25; --ink: #e7eaee; --muted: #9aa4b1; --line: #2c333c;
+    --accent: #6f9bff; --accent-ink: #0b1020; --user: #1f2a44; --ok: #5cc98a; --warn: #f0b04a; --bad: #ff7b72;
+    --chip: #232a32;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--panel); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+header h1 { font-size: 17px; margin: 0; }
+header .model { color: var(--muted); font-size: 13px; }
+main { max-width: 1100px; margin: 0 auto; padding: 16px; display: grid; grid-template-columns: 1fr 320px; gap: 16px; }
+@media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+#chat { display: flex; flex-direction: column; height: calc(100vh - 110px); min-height: 420px; }
+#log { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.msg { max-width: 85%; padding: 10px 12px; border-radius: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg.user { align-self: flex-end; background: var(--user); }
+.msg.bot { align-self: flex-start; border: 1px solid var(--line); }
+.msg.bot code { background: var(--chip); padding: 1px 5px; border-radius: 4px; }
+.msg.sys { align-self: center; color: var(--muted); font-size: 13px; }
+.trace { align-self: flex-start; font-size: 12.5px; color: var(--muted); display: flex; flex-direction: column; gap: 3px; }
+.trace code { background: var(--chip); padding: 2px 6px; border-radius: 5px; color: var(--ink); }
+.ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+form#send { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
+input, select, textarea, button { font: inherit; color: inherit; }
+input[type=text], select { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+#msg { flex: 1; }
+button { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+button.secondary { background: var(--chip); color: var(--ink); border: 1px solid var(--line); }
+button:disabled { opacity: .5; cursor: default; }
+aside { display: flex; flex-direction: column; gap: 16px; }
+aside .panel { padding: 14px; }
+aside h2 { font-size: 14px; margin: 0 0 10px; }
+label { display: block; font-size: 13px; color: var(--muted); margin: 8px 0 4px; }
+aside input[type=text], aside select { width: 100%; }
+.row { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+.hint { font-size: 12.5px; color: var(--muted); margin: 8px 0 0; }
+.examples button { display: block; width: 100%; text-align: left; margin-top: 6px; background: var(--chip); color: var(--ink); border: 1px solid var(--line); font-size: 13px; }
+#audit { font-size: 12px; max-height: 220px; overflow-y: auto; color: var(--muted); }
+#audit div { border-bottom: 1px solid var(--line); padding: 4px 0; overflow-wrap: anywhere; }
+</style>
+</head>
+<body>
+<header>
+  <h1>OpsPilot · IT Support &amp; Automation</h1>
+  <span class="model" id="model">not signed in</span>
+</header>
+<main>
+  <section class="panel" id="chat">
+    <div id="log"><div class="msg sys">Sign in on the right, then describe your IT issue.</div></div>
+    <form id="send">
+      <input id="msg" type="text" placeholder="e.g. I'm locked out and my disk is full" autocomplete="off" disabled>
+      <button id="go" disabled>Send</button>
+    </form>
+  </section>
+  <aside>
+    <div class="panel">
+      <h2>Session</h2>
+      <label for="user">User</label>
+      <select id="user">
+        <option value="alice">alice (Finance, locked out, low disk)</option>
+        <option value="bob">bob (Engineering, VPN issues)</option>
+        <option value="dana">dana (IT)</option>
+      </select>
+      <label for="role">Role</label>
+      <select id="role">
+        <option value="employee">employee (self-service)</option>
+        <option value="it_agent">it_agent</option>
+        <option value="it_admin">it_admin</option>
+      </select>
+      <div class="row"><input type="checkbox" id="incident"><label for="incident" style="margin:0">P1 incident mode</label></div>
+      <div class="row"><button id="start" type="button">Start session</button>
+        <button id="undo" class="secondary" type="button" disabled>Undo last change</button></div>
+    </div>
+    <div class="panel">
+      <h2>Approvers on call</h2>
+      <input id="approvers" type="text" value="dana" placeholder="comma-separated ids">
+      <p class="hint">Used when an action needs approval. HIGH needs 1, CRITICAL needs 2 distinct people, and nobody can approve their own request. Clear the field to reject.</p>
+    </div>
+    <div class="panel examples">
+      <h2>Try</h2>
+      <button type="button">I'm locked out and my laptop says the disk is almost full</button>
+      <button type="button">Can you reset bob's password?</button>
+      <button type="button">My VPN keeps dropping on home wifi</button>
+      <button type="button">Add alice to vpn-users</button>
+      <button type="button">Give bob access to it-admins</button>
+      <button type="button">Check active alerts and fix what you safely can</button>
+    </div>
+    <div class="panel">
+      <h2>Audit log <button id="refresh" class="secondary" type="button" style="padding:2px 8px;font-size:12px">refresh</button></h2>
+      <div id="chain" class="hint"></div>
+      <div id="audit"></div>
+    </div>
+  </aside>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+let sid = null;
+
+// Minimal, safe markdown: escape first, then bold / inline code / bullets.
+function md(text) {
+  const esc = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return esc
+    .replace(/`([^`\n]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/^\s*[*-] /gm, "• ");
+}
+
+function add(cls, text) {
+  const d = document.createElement("div");
+  d.className = "msg " + cls;
+  if (cls === "bot") d.innerHTML = md(text); else d.textContent = text;
+  $("log").appendChild(d);
+  $("log").scrollTop = $("log").scrollHeight;
+  return d;
+}
+
+function trace(tools, approvals) {
+  if (!tools.length) return;
+  const t = document.createElement("div");
+  t.className = "trace";
+  for (const a of approvals) {
+    const line = document.createElement("div");
+    line.innerHTML = `<span class="warn">approval [${a.risk}]</span> `;
+    line.append(`${a.plan} · approvers: ${a.approvers.join(", ") || "none"}`);
+    t.appendChild(line);
+  }
+  for (const x of tools) {
+    const r = x.result || {};
+    const line = document.createElement("div");
+    const c = document.createElement("code");
+    c.textContent = `${x.tool}(${Object.values(x.args).join(", ")})`;
+    const s = document.createElement("span");
+    s.className = r.error ? "bad" : "ok";
+    s.textContent = r.error ? ` ${r.error}${r.reason ? ": " + r.reason : ""}` : " ok";
+    line.append(c, s);
+    t.appendChild(line);
+  }
+  $("log").appendChild(t);
+}
+
+async function api(path, body) {
+  const r = await fetch(path, { method: body ? "POST" : "GET", headers: { "Content-Type": "application/json" },
+                                body: body ? JSON.stringify(body) : undefined });
+  return r.json();
+}
+
+async function refreshAudit() {
+  const a = await api("/api/audit");
+  $("chain").innerHTML = a.ok ? '<span class="ok">hash chain intact</span>' : `<span class="bad">${a.message}</span>`;
+  $("audit").replaceChildren(...a.entries.reverse().map((e) => {
+    const d = document.createElement("div");
+    d.textContent = `${e.ts.slice(11, 19)} ${e.event} ${e.tool || ""} ${e.verdict || ""} ${e.reason || ""}`;
+    return d;
+  }));
+}
+
+$("start").onclick = async () => {
+  const r = await api("/api/session", { user: $("user").value, role: $("role").value, incident: $("incident").checked });
+  if (r.error) return add("sys", r.error);
+  sid = r.session_id;
+  $("model").textContent = `${$("user").value} · ${$("role").value} · ${r.model}`;
+  $("msg").disabled = $("go").disabled = false;
+  $("undo").disabled = true;
+  $("log").replaceChildren();
+  add("sys", `Signed in as ${$("user").value} (${$("role").value}). How can I help?`);
+  $("msg").focus();
+};
+
+$("send").onsubmit = async (e) => {
+  e.preventDefault();
+  const text = $("msg").value.trim();
+  if (!text || !sid) return;
+  $("msg").value = "";
+  add("user", text);
+  $("go").disabled = true;
+  const wait = add("sys", "working…");
+  try {
+    const r = await api("/api/chat", { session_id: sid, message: text, approvers: $("approvers").value });
+    wait.remove();
+    if (r.error) { add("sys", r.error); return; }
+    trace(r.tools, r.approvals);
+    add("bot", r.reply || "(no reply)");
+    $("undo").disabled = !r.undo_available;
+    $("model").textContent = `${$("user").value} · ${$("role").value} · ${r.model}`;
+  } catch (err) {
+    wait.textContent = "Network error: " + err;
+  } finally {
+    $("go").disabled = false;
+    refreshAudit();
+  }
+};
+
+$("undo").onclick = async () => {
+  const r = await api("/api/undo", { session_id: sid });
+  const res = r.result;
+  add("sys", res.error ? `Undo failed: ${res.error} ${res.reason || ""}` : `Undone: ${res.undone}`);
+  $("undo").disabled = !r.undo_available;
+  refreshAudit();
+};
+
+document.querySelectorAll(".examples button").forEach((b) => b.onclick = () => {
+  if (!sid) return add("sys", "Start a session first.");
+  $("msg").value = b.textContent;
+  $("send").requestSubmit();
+});
+$("refresh").onclick = refreshAudit;
+refreshAudit();
+</script>
+</body>
+</html>

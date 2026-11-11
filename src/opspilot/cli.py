@@ -2,6 +2,7 @@
 
   opspilot chat --user alice --role employee     # interactive help-desk chat
   opspilot heal                                  # self-healing pass over active alerts
+  opspilot web --port 8080                       # browser chat UI
   opspilot audit-verify                          # check the audit hash chain
 """
 
@@ -72,6 +73,13 @@ def cmd_verify(a: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+def cmd_web(a: argparse.Namespace) -> int:
+    from .web import serve
+
+    serve(a.host, a.port)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="opspilot")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -84,6 +92,10 @@ def main(argv: list[str] | None = None) -> int:
     h = sub.add_parser("heal")
     h.add_argument("--model", default=None)
     h.set_defaults(fn=cmd_heal)
+    w = sub.add_parser("web", help="browser chat UI")
+    w.add_argument("--host", default="127.0.0.1")
+    w.add_argument("--port", type=int, default=8080)
+    w.set_defaults(fn=cmd_web)
     sub.add_parser("audit-verify").set_defaults(fn=cmd_verify)
     a = p.parse_args(argv)
     return a.fn(a)

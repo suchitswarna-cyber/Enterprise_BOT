@@ -57,7 +57,7 @@ Each later phase is independently shippable.
 
 | Layer | Prototype | Production options |
 |---|---|---|
-| Model | Gemini (`gemini-flash-latest`, configurable) | Gemini Pro for hard diagnostics; Flash for chat |
+| Model | Gemini (`gemini-3.5-flash`, configurable) | Gemini Pro for hard diagnostics; Flash for chat |
 | Runtime | Python CLI | FastAPI on Cloud Run / AKS / ECS |
 | State | in-memory + JSONL | Postgres + Redis |
 | Channels | CLI | Teams, Slack, web portal |
