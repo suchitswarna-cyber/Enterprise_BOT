@@ -223,7 +223,36 @@ function add(cls, text) {
 async function api(path, body) {
   const r = await fetch(path, { method: body ? "POST" : "GET", headers: { "Content-Type": "application/json" },
                                 body: body ? JSON.stringify(body) : undefined });
-  return r.json();
+  const j = await r.json().catch(() => ({ error: `${r.status} ${r.statusText}` }));
+  if (sid && (r.status === 401 || /unknown session|start a session/i.test(j.error || ""))) sessionLost();
+  return j;
+}
+
+// The server keeps sessions in memory, so a restart forgets them. Reset the page
+// instead of failing silently on every request.
+function sessionLost() {
+  sid = null; role = null;
+  $("msg").disabled = $("go").disabled = $("undo").disabled = true;
+  $("reset").hidden = true;
+  $("model").textContent = "session expired · start a new session";
+  add("sys", "Your session expired (the server was restarted). Click Start session to continue.");
+}
+
+// Give every refresh button visible feedback: busy while loading, then the time.
+async function refreshing(btn, fn) {
+  const text = btn.dataset.label || (btn.dataset.label = btn.textContent);
+  btn.disabled = true; btn.textContent = "Refreshing…";
+  try {
+    await fn();
+    btn.textContent = `Updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
+  } catch (err) {
+    btn.textContent = "Refresh failed";
+    btn.title = String(err.message || err);
+  } finally {
+    btn.disabled = false;
+    clearTimeout(btn._t);
+    btn._t = setTimeout(() => { btn.textContent = text; btn.title = ""; }, 2500);
+  }
 }
 const when = (iso) => iso ? new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "seeded";
 
@@ -317,7 +346,11 @@ function progress() {
 
 async function streamChat(body, onEvent) {
   const res = await fetch("/api/chat/stream", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  if (!res.ok || !res.body) { const j = await res.json().catch(() => ({})); throw new Error(j.error || res.statusText); }
+  if (!res.ok || !res.body) {
+    const j = await res.json().catch(() => ({}));
+    if (/unknown session/i.test(j.error || "")) { sessionLost(); throw new Error("session expired"); }
+    throw new Error(j.error || res.statusText);
+  }
   const reader = res.body.getReader(), dec = new TextDecoder();
   let buf = "", final = null;
   for (;;) {
@@ -394,7 +427,7 @@ document.querySelectorAll(".examples button").forEach((b) => b.onclick = () => {
   $("msg").value = b.textContent;
   $("send").requestSubmit();
 });
-$("refresh").onclick = refreshAudit;
+$("refresh").onclick = (e) => refreshing(e.currentTarget, refreshAudit);
 
 // ------------------------------------------------------------ tickets & KB
 async function loadTickets() {
@@ -404,6 +437,12 @@ async function loadTickets() {
     return;
   }
   const [t, k] = await Promise.all([api(`/api/tickets?session_id=${sid}`), api(`/api/kb?session_id=${sid}`)]);
+  if (t.error || k.error || !t.tickets || !k.articles) {
+    $("tickets-hint").textContent = sid ? `Could not load tickets: ${t.error || k.error}`
+                                        : "Your session expired. Start a session on the Chat tab to see tickets.";
+    $("tickets").replaceChildren(); $("kb").replaceChildren(); $("kb-hint").textContent = "";
+    return;
+  }
   $("tickets-title").textContent = t.scope === "all" ? "All tickets" : "My tickets";
   $("tickets-hint").textContent = t.scope === "all"
     ? "Problem tickets (PRB) are opened automatically when several similar incidents arrive within minutes."
@@ -450,7 +489,7 @@ async function loadTickets() {
     return d;
   }));
 }
-$("tickets-refresh").onclick = loadTickets;
+$("tickets-refresh").onclick = (e) => refreshing(e.currentTarget, loadTickets);
 
 // ---------------------------------------------------------------- dashboard
 const tip = $("tip");
@@ -519,7 +558,7 @@ async function loadDash() {
   $("defs").textContent = `Self-resolved: ${s.definitions.self_resolved}. Deflection rate: ${s.definitions.deflection_rate}. ` +
     `Sessions: ${k.sessions}. Metrics come from the tamper-evident audit log.`;
 }
-$("dash-refresh").onclick = loadDash;
+$("dash-refresh").onclick = (e) => refreshing(e.currentTarget, loadDash);
 $("reset").onclick = async () => {
   if (!confirm("Reset all demo tickets, users and devices to the seeded data?")) return;
   const r = await api("/api/demo/reset", { session_id: sid });
