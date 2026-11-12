@@ -12,10 +12,12 @@ Each tool declares:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Callable
 
 from .connectors import RUNBOOKS, Systems
 from .policy import Risk
+from .spikes import check_spike
 
 PRIVILEGED_GROUPS = {"it-admins", "prod-db-readers"}
 
@@ -35,6 +37,8 @@ class Tool:
     handler: Callable[[Systems, dict], Outcome]
     subject: Callable[[Systems, dict], str | None] = lambda s, a: a.get("user_id")
     preview: Callable[[dict], str] | None = None
+    # False = only callable from the UI/API (e.g. human KB review), never offered to the model.
+    model_visible: bool = True
 
     def risk_for(self, args: dict) -> Risk:
         return self.risk(args) if callable(self.risk) else self.risk
@@ -117,7 +121,13 @@ def _runbook(s: Systems, a: dict) -> Outcome:
 def _create_ticket(s: Systems, a: dict) -> Outcome:
     dupes = s.tickets.find_similar(a["title"])
     tid = s.tickets.create(a["title"], a["description"], a["priority"], a["user_id"])
-    return Outcome({"ticket_id": tid, "possible_duplicates": dupes},
+    result = {"ticket_id": tid, "possible_duplicates": dupes}
+    spike = check_spike(s.tickets, tid, datetime.now(timezone.utc))
+    if spike:
+        result["outage_problem"] = spike
+        result["next_step"] = (f"this looks like part of a wider outage tracked as {spike['problem_id']}; "
+                               "tell the user IT is already on it")
+    return Outcome(result,
                    ("set_ticket_status", {"ticket_id": tid, "status": "closed", "note": "cancelled (rollback)"},
                     f"cancel {tid}"))
 
@@ -140,6 +150,10 @@ def _resolve(s: Systems, a: dict) -> Outcome:
     return Outcome({"ticket_id": a["ticket_id"], "status": "resolved", "kb_draft": kb},
                    ("set_ticket_status", {"ticket_id": a["ticket_id"], "status": t["status"], "note": "reopened"},
                     "reopen ticket"))
+
+
+def _review_kb(s: Systems, a: dict) -> Outcome:
+    return Outcome(s.kb.review(a["kb_id"], a["decision"] == "publish", a["note"]))
 
 
 # -------------------------------------------------------------------- registry
@@ -204,6 +218,13 @@ def build_tools() -> dict[str, Tool]:
         Tool("disable_account", "Disable an account entirely (offboarding, confirmed compromise).",
              {"user_id": uid, "reason": _s("Justification")}, Risk.CRITICAL, _set_enabled(False),
              preview=lambda a: f"DISABLE account {a['user_id']} — reason: {a['reason']}"),
+        # Human-only ------------------------------------------------------------
+        # Publishing a KB draft is a human review step: the model drafted it, so the
+        # model must not be the one approving it. Not self-service, so IT staff only.
+        Tool("review_kb_article", "Publish or reject a drafted KB article.",
+             {"kb_id": _s("Article id"), "decision": _s("Review decision", ["publish", "reject"]),
+              "note": _s("Reviewer note; empty string for none")},
+             Risk.LOW, _review_kb, subject=lambda s, a: None, model_visible=False),
     ]
     return {t.name: t for t in tools}
 

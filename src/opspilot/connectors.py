@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 
 # --------------------------------------------------------------------- identity
@@ -84,13 +85,33 @@ class MockTicketing:
                      "priority": "P3", "requester": "alice", "notes": []},
     })
     _seq: int = 1003
+    _prb_seq: int = 1
 
-    def create(self, title: str, description: str, priority: str, requester: str) -> str:
-        tid = f"INC-{self._seq}"
-        self._seq += 1
+    def create(self, title: str, description: str, priority: str, requester: str,
+               kind: str = "incident", now: datetime | None = None) -> str:
+        if kind == "problem":
+            tid = f"PRB-{self._prb_seq:04d}"
+            self._prb_seq += 1
+        else:
+            tid = f"INC-{self._seq}"
+            self._seq += 1
         self.tickets[tid] = {"title": title, "description": description, "status": "open",
-                             "priority": priority, "requester": requester, "notes": []}
+                             "priority": priority, "requester": requester, "notes": [], "kind": kind,
+                             "created_at": (now or datetime.now(timezone.utc)).isoformat()}
+        if kind == "problem":
+            self.tickets[tid]["linked"] = []
         return tid
+
+    def link_to_problem(self, ticket_id: str, problem_id: str) -> None:
+        prb = self.tickets[problem_id]
+        if ticket_id not in prb["linked"]:
+            prb["linked"].append(ticket_id)
+        self.tickets[ticket_id]["problem"] = problem_id
+
+    def list(self, requester: str | None = None) -> list[dict]:
+        rows = [{"ticket_id": tid, **t} for tid, t in self.tickets.items()
+                if requester is None or t["requester"] == requester]
+        return sorted(rows, key=lambda r: r.get("created_at", ""), reverse=True)
 
     def get(self, ticket_id: str) -> dict:
         if ticket_id not in self.tickets:
@@ -210,6 +231,8 @@ class MockKnowledgeBase:
         q = _tokens(query)
         hits = []
         for kid, a in self.articles.items():
+            if a["status"] != "published":
+                continue
             score = len(q & _tokens(a["title"] + " " + a["body"]))
             if score:
                 hits.append((score, {"kb_id": kid, "title": a["title"], "body": a["body"]}))
@@ -220,6 +243,21 @@ class MockKnowledgeBase:
         self._seq += 1
         self.articles[kid] = {"title": title, "body": body, "status": "draft", "source": source_ticket}
         return kid
+
+    def list(self, status: str | None = None) -> list[dict]:
+        return [{"kb_id": k, **a} for k, a in self.articles.items() if status is None or a["status"] == status]
+
+    def review(self, kb_id: str, publish: bool, note: str = "") -> dict:
+        """Human review of a drafted article: publish it (searchable) or reject it."""
+        if kb_id not in self.articles:
+            raise KeyError(f"no such article '{kb_id}'")
+        a = self.articles[kb_id]
+        if a["status"] != "draft":
+            raise ValueError(f"{kb_id} is already {a['status']}")
+        a["status"] = "published" if publish else "rejected"
+        if note:
+            a["review_note"] = note
+        return {"kb_id": kb_id, "status": a["status"]}
 
 
 @dataclass

@@ -9,10 +9,11 @@ Kept independent of any LLM so it can be tested and reused by other front ends
 
 from __future__ import annotations
 
+import threading
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Callable
+from typing import Any, Callable
 
 from .audit import AuditLog
 from .connectors import Systems
@@ -41,6 +42,8 @@ class Orchestrator:
     journal: RollbackJournal = field(default_factory=RollbackJournal)
     session_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
     mutations: int = 0
+    # Serialises tool execution. Pass one shared RLock when several sessions share `systems`.
+    lock: Any = field(default_factory=threading.RLock)
 
     # ------------------------------------------------------------------ helpers
     def _validate(self, tool: Tool, args: dict) -> str | None:
@@ -62,6 +65,10 @@ class Orchestrator:
 
     # ------------------------------------------------------------------ execute
     def execute(self, name: str, args: dict, *, is_undo: bool = False) -> dict:
+        with self.lock:
+            return self._execute(name, args, is_undo=is_undo)
+
+    def _execute(self, name: str, args: dict, *, is_undo: bool = False) -> dict:
         tool = self.tools.get(name)
         if tool is None:
             return {"error": f"unknown tool '{name}'"}
