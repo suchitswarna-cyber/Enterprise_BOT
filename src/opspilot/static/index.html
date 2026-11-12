@@ -8,22 +8,27 @@
 :root {
   --bg: #f5f6f8; --panel: #ffffff; --ink: #1b1f24; --muted: #5d6673; --line: #dfe3e8;
   --accent: #2457d6; --accent-ink: #ffffff; --user: #e8eefc; --ok: #1d7a46; --warn: #a15c00; --bad: #b42318;
-  --chip: #f0f2f5;
+  --chip: #f0f2f5; --bar: #2457d6;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #111418; --panel: #1a1f25; --ink: #e7eaee; --muted: #9aa4b1; --line: #2c333c;
     --accent: #6f9bff; --accent-ink: #0b1020; --user: #1f2a44; --ok: #5cc98a; --warn: #f0b04a; --bad: #ff7b72;
-    --chip: #232a32;
+    --chip: #232a32; --bar: #6f9bff;
   }
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-header { padding: 14px 16px; border-bottom: 1px solid var(--line); background: var(--panel); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+header { padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--panel); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 header h1 { font-size: 17px; margin: 0; }
 header .model { color: var(--muted); font-size: 13px; }
-main { max-width: 1100px; margin: 0 auto; padding: 16px; display: grid; grid-template-columns: 1fr 320px; gap: 16px; }
-@media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+nav.tabs { display: flex; gap: 4px; margin-left: auto; }
+nav.tabs button { background: transparent; color: var(--muted); border: 1px solid transparent; padding: 6px 12px; }
+nav.tabs button[aria-selected=true] { background: var(--chip); color: var(--ink); border-color: var(--line); }
+main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+.view[hidden] { display: none !important; }
+#view-chat { display: grid; grid-template-columns: 1fr 320px; gap: 16px; }
+@media (max-width: 860px) { #view-chat { grid-template-columns: 1fr; } nav.tabs { margin-left: 0; width: 100%; } }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
 #chat { display: flex; flex-direction: column; height: calc(100vh - 110px); min-height: 420px; }
 #log { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
@@ -32,8 +37,11 @@ main { max-width: 1100px; margin: 0 auto; padding: 16px; display: grid; grid-tem
 .msg.bot { align-self: flex-start; border: 1px solid var(--line); }
 .msg.bot code { background: var(--chip); padding: 1px 5px; border-radius: 4px; }
 .msg.sys { align-self: center; color: var(--muted); font-size: 13px; }
-.trace { align-self: flex-start; font-size: 12.5px; color: var(--muted); display: flex; flex-direction: column; gap: 3px; }
-.trace code { background: var(--chip); padding: 2px 6px; border-radius: 5px; color: var(--ink); }
+.trace { align-self: flex-start; font-size: 13px; color: var(--muted); display: flex; flex-direction: column; gap: 3px; max-width: 85%; }
+.trace .step { display: flex; gap: 6px; align-items: baseline; }
+.trace .step .icon { width: 1em; flex: none; text-align: center; }
+.trace .status { font-style: italic; }
+.trace .elapsed { font-variant-numeric: tabular-nums; }
 .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
 form#send { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
 input, select, textarea, button { font: inherit; color: inherit; }
@@ -41,10 +49,11 @@ input[type=text], select { background: var(--bg); border: 1px solid var(--line);
 #msg { flex: 1; }
 button { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 8px; padding: 8px 14px; cursor: pointer; }
 button.secondary { background: var(--chip); color: var(--ink); border: 1px solid var(--line); }
+button.small { padding: 3px 10px; font-size: 13px; }
 button:disabled { opacity: .5; cursor: default; }
 aside { display: flex; flex-direction: column; gap: 16px; }
-aside .panel { padding: 14px; }
-aside h2 { font-size: 14px; margin: 0 0 10px; }
+aside .panel, .card { padding: 14px; }
+h2 { font-size: 14px; margin: 0 0 10px; }
 label { display: block; font-size: 13px; color: var(--muted); margin: 8px 0 4px; }
 aside input[type=text], aside select { width: 100%; }
 .row { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
@@ -52,132 +61,333 @@ aside input[type=text], aside select { width: 100%; }
 .examples button { display: block; width: 100%; text-align: left; margin-top: 6px; background: var(--chip); color: var(--ink); border: 1px solid var(--line); font-size: 13px; }
 #audit { font-size: 12px; max-height: 220px; overflow-y: auto; color: var(--muted); }
 #audit div { border-bottom: 1px solid var(--line); padding: 4px 0; overflow-wrap: anywhere; }
+
+/* Tickets & KB */
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.toolbar h2 { margin: 0; }
+.toolbar .spacer { flex: 1; }
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; font-size: 12.5px; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.badge { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--chip); border: 1px solid var(--line); white-space: nowrap; }
+.badge.problem { border-color: var(--bad); color: var(--bad); }
+.badge.open { color: var(--warn); } .badge.resolved { color: var(--ok); }
+tr.problem td { background: color-mix(in srgb, var(--bad) 6%, transparent); }
+.kb { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
+.kb .meta { font-size: 12.5px; color: var(--muted); }
+.kb p { margin: 6px 0; white-space: pre-wrap; }
+.empty { color: var(--muted); font-size: 13.5px; padding: 8px 0; }
+
+/* Dashboard */
+.kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+.kpi { padding: 12px 14px; }
+.kpi .label { font-size: 12.5px; color: var(--muted); }
+.kpi .value { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.2; margin-top: 2px; }
+.kpi .sub { font-size: 12px; color: var(--muted); }
+.charts { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.bars { display: flex; flex-direction: column; gap: 8px; }
+.bar-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; font-size: 13px; cursor: default; }
+.bar-row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-row .val { font-variant-numeric: tabular-nums; color: var(--ink); }
+.bar-row .track { grid-column: 1 / -1; height: 14px; display: flex; align-items: center; }
+.bar-row .fill { height: 10px; min-width: 2px; background: var(--bar); border-radius: 0 4px 4px 0; }
+.bar-row:hover .fill { filter: brightness(1.15); }
+#tip { position: fixed; pointer-events: none; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-size: 12.5px; box-shadow: 0 4px 16px rgb(0 0 0 / .15); z-index: 10; max-width: 320px; }
 </style>
 </head>
 <body>
 <header>
   <h1>OpsPilot · IT Support &amp; Automation</h1>
   <span class="model" id="model">not signed in</span>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-view="chat" aria-selected="true">Chat</button>
+    <button role="tab" data-view="tickets" aria-selected="false">Tickets &amp; KB</button>
+    <button role="tab" data-view="dash" aria-selected="false">Dashboard</button>
+  </nav>
 </header>
 <main>
-  <section class="panel" id="chat">
-    <div id="log"><div class="msg sys">Sign in on the right, then describe your IT issue.</div></div>
-    <form id="send">
-      <input id="msg" type="text" placeholder="e.g. I'm locked out and my disk is full" autocomplete="off" disabled>
-      <button id="go" disabled>Send</button>
-    </form>
-  </section>
-  <aside>
-    <div class="panel">
-      <h2>Session</h2>
-      <label for="user">User</label>
-      <select id="user">
-        <option value="alice">alice (Finance, locked out, low disk)</option>
-        <option value="bob">bob (Engineering, VPN issues)</option>
-        <option value="dana">dana (IT)</option>
-      </select>
-      <label for="role">Role</label>
-      <select id="role">
-        <option value="employee">employee (self-service)</option>
-        <option value="it_agent">it_agent</option>
-        <option value="it_admin">it_admin</option>
-      </select>
-      <div class="row"><input type="checkbox" id="incident"><label for="incident" style="margin:0">P1 incident mode</label></div>
-      <div class="row"><button id="start" type="button">Start session</button>
-        <button id="undo" class="secondary" type="button" disabled>Undo last change</button></div>
-    </div>
-    <div class="panel">
-      <h2>Approvers on call</h2>
-      <input id="approvers" type="text" value="dana" placeholder="comma-separated ids">
-      <p class="hint">Used when an action needs approval. HIGH needs 1, CRITICAL needs 2 distinct people, and nobody can approve their own request. Clear the field to reject.</p>
-    </div>
-    <div class="panel examples">
-      <h2>Try</h2>
-      <button type="button">I'm locked out and my laptop says the disk is almost full</button>
-      <button type="button">Can you reset bob's password?</button>
-      <button type="button">My VPN keeps dropping on home wifi</button>
-      <button type="button">Add alice to vpn-users</button>
-      <button type="button">Give bob access to it-admins</button>
-      <button type="button">Check active alerts and fix what you safely can</button>
-    </div>
-    <div class="panel">
-      <h2>Audit log <button id="refresh" class="secondary" type="button" style="padding:2px 8px;font-size:12px">refresh</button></h2>
-      <div id="chain" class="hint"></div>
-      <div id="audit"></div>
-    </div>
-  </aside>
+  <!-- ------------------------------------------------------------- Chat -->
+  <div class="view" id="view-chat">
+    <section class="panel" id="chat">
+      <div id="log"><div class="msg sys">Sign in on the right, then describe your IT issue.</div></div>
+      <form id="send">
+        <input id="msg" type="text" placeholder="e.g. I'm locked out and my disk is full" autocomplete="off" disabled>
+        <button id="go" disabled>Send</button>
+      </form>
+    </section>
+    <aside>
+      <div class="panel">
+        <h2>Session</h2>
+        <label for="user">User</label>
+        <select id="user">
+          <option value="alice">alice (Finance, locked out, low disk)</option>
+          <option value="bob">bob (Engineering, VPN issues)</option>
+          <option value="dana">dana (IT)</option>
+          <option value="priya">priya (HR, no MFA, wants VPN access)</option>
+          <option value="marco">marco (Sales, disabled after leave)</option>
+          <option value="sam">sam (Engineering, printer stuck, firewall off)</option>
+          <option value="lee">lee (Finance contractor, locked out, low disk)</option>
+          <option value="jordan">jordan (IT support agent)</option>
+        </select>
+        <label for="role">Role</label>
+        <select id="role">
+          <option value="employee">employee (self-service)</option>
+          <option value="it_agent">it_agent</option>
+          <option value="it_admin">it_admin</option>
+        </select>
+        <div class="row"><input type="checkbox" id="incident"><label for="incident" style="margin:0">P1 incident mode</label></div>
+        <div class="row"><button id="start" type="button">Start session</button>
+          <button id="undo" class="secondary" type="button" disabled>Undo last change</button></div>
+      </div>
+      <div class="panel">
+        <h2>Approvers on call</h2>
+        <input id="approvers" type="text" value="dana" placeholder="comma-separated ids">
+        <p class="hint">Used when an action needs approval. HIGH needs 1, CRITICAL needs 2 distinct people, and nobody can approve their own request. Clear the field to reject.</p>
+      </div>
+      <div class="panel examples">
+        <h2>Try</h2>
+        <button type="button">I'm locked out and my laptop says the disk is almost full</button>
+        <button type="button">Can you reset bob's password?</button>
+        <button type="button">My VPN keeps dropping on home wifi</button>
+        <button type="button">Add alice to vpn-users</button>
+        <button type="button">Give bob access to it-admins</button>
+        <button type="button">Check active alerts and fix what you safely can</button>
+        <button type="button">The office printer is down, please open a ticket</button>
+        <button type="button">How do I set up MFA?</button>
+        <button type="button">My print jobs are stuck and my laptop is really slow</button>
+        <button type="button">Give lee read access to the production database</button>
+      </div>
+      <div class="panel">
+        <h2>Audit log <button id="refresh" class="secondary small" type="button">refresh</button></h2>
+        <div id="chain" class="hint"></div>
+        <div id="audit"></div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- -------------------------------------------------- Tickets & KB -->
+  <div class="view stack" id="view-tickets" hidden>
+    <section class="panel card">
+      <div class="toolbar"><h2 id="tickets-title">Tickets</h2><span class="spacer"></span>
+        <button class="secondary small" type="button" id="tickets-refresh">refresh</button></div>
+      <p class="hint" id="tickets-hint"></p>
+      <div class="table-wrap" id="tickets"></div>
+    </section>
+    <section class="panel card">
+      <div class="toolbar"><h2>Knowledge base</h2><span class="spacer"></span></div>
+      <p class="hint" id="kb-hint"></p>
+      <div id="kb"></div>
+    </section>
+  </div>
+
+  <!-- ------------------------------------------------------ Dashboard -->
+  <div class="view stack" id="view-dash" hidden>
+    <div class="toolbar"><h2 style="font-size:16px">Service desk dashboard</h2><span class="spacer"></span>
+      <button class="secondary small" type="button" id="reset" hidden>Reset demo data</button>
+      <button class="secondary small" type="button" id="dash-refresh">refresh</button></div>
+    <div class="kpis" id="kpis"></div>
+    <div class="charts" id="charts"></div>
+    <p class="hint" id="defs"></p>
+  </div>
 </main>
+<div id="tip" hidden></div>
 <script>
 const $ = (id) => document.getElementById(id);
-let sid = null;
+let sid = null, role = null;
 
+// ------------------------------------------------------------------ helpers
+const esc = (t) => String(t ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 // Minimal, safe markdown: escape first, then bold / inline code / bullets.
 function md(text) {
-  const esc = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  return esc
+  return esc(text)
     .replace(/`([^`\n]+)`/g, "<code>$1</code>")
     .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
     .replace(/^\s*[*-] /gm, "• ");
 }
-
+function el(tag, cls, text) {
+  const d = document.createElement(tag);
+  if (cls) d.className = cls;
+  if (text !== undefined) d.textContent = text;
+  return d;
+}
 function add(cls, text) {
-  const d = document.createElement("div");
-  d.className = "msg " + cls;
+  const d = el("div", "msg " + cls);
   if (cls === "bot") d.innerHTML = md(text); else d.textContent = text;
   $("log").appendChild(d);
   $("log").scrollTop = $("log").scrollHeight;
   return d;
 }
-
-function trace(tools, approvals) {
-  if (!tools.length) return;
-  const t = document.createElement("div");
-  t.className = "trace";
-  for (const a of approvals) {
-    const line = document.createElement("div");
-    line.innerHTML = `<span class="warn">approval [${a.risk}]</span> `;
-    line.append(`${a.plan} · approvers: ${a.approvers.join(", ") || "none"}`);
-    t.appendChild(line);
-  }
-  for (const x of tools) {
-    const r = x.result || {};
-    const line = document.createElement("div");
-    const c = document.createElement("code");
-    c.textContent = `${x.tool}(${Object.values(x.args).join(", ")})`;
-    const s = document.createElement("span");
-    s.className = r.error ? "bad" : "ok";
-    s.textContent = r.error ? ` ${r.error}${r.reason ? ": " + r.reason : ""}` : " ok";
-    line.append(c, s);
-    t.appendChild(line);
-  }
-  $("log").appendChild(t);
-}
-
 async function api(path, body) {
   const r = await fetch(path, { method: body ? "POST" : "GET", headers: { "Content-Type": "application/json" },
                                 body: body ? JSON.stringify(body) : undefined });
-  return r.json();
+  const j = await r.json().catch(() => ({ error: `${r.status} ${r.statusText}` }));
+  if (sid && (r.status === 401 || /unknown session|start a session/i.test(j.error || ""))) sessionLost();
+  return j;
 }
 
+// The server keeps sessions in memory, so a restart forgets them. Reset the page
+// instead of failing silently on every request.
+function sessionLost() {
+  sid = null; role = null;
+  $("msg").disabled = $("go").disabled = $("undo").disabled = true;
+  $("reset").hidden = true;
+  $("model").textContent = "session expired · start a new session";
+  add("sys", "Your session expired (the server was restarted). Click Start session to continue.");
+}
+
+// Give every refresh button visible feedback: busy while loading, then the time.
+async function refreshing(btn, fn) {
+  const text = btn.dataset.label || (btn.dataset.label = btn.textContent);
+  btn.disabled = true; btn.textContent = "Refreshing…";
+  try {
+    await fn();
+    btn.textContent = `Updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
+  } catch (err) {
+    btn.textContent = "Refresh failed";
+    btn.title = String(err.message || err);
+  } finally {
+    btn.disabled = false;
+    clearTimeout(btn._t);
+    btn._t = setTimeout(() => { btn.textContent = text; btn.title = ""; }, 2500);
+  }
+}
+const when = (iso) => iso ? new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "seeded";
+
+// --------------------------------------------------------------------- tabs
+function show(view) {
+  document.querySelectorAll("nav.tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.view === view)));
+  document.querySelectorAll(".view").forEach((v) => v.hidden = v.id !== "view-" + view);
+  if (view === "tickets") loadTickets();
+  if (view === "dash") loadDash();
+}
+document.querySelectorAll("nav.tabs button").forEach((b) => b.onclick = () => show(b.dataset.view));
+
+// ------------------------------------------------------- live chat progress
+const LABELS = {
+  lookup_user: (a) => `Looked up ${a.user_id}`,
+  list_user_devices: (a) => `Listed ${a.user_id}'s devices`,
+  check_device_health: (a) => `Checked health of ${a.device_id}`,
+  list_active_alerts: () => "Checked active monitoring alerts",
+  search_kb: (a) => `Searched the knowledge base for “${a.query}”`,
+  find_similar_tickets: () => "Looked for similar open tickets",
+  get_ticket: (a) => `Read ${a.ticket_id}`,
+  unlock_account: (a) => `Unlock ${a.user_id}'s account`,
+  lock_account: (a) => `Lock ${a.user_id}'s account`,
+  reset_password: (a) => `Reset ${a.user_id}'s password`,
+  create_ticket: (a) => `Open ticket “${a.title}” (${a.priority})`,
+  run_runbook: (a) => `Run ${a.runbook.replace(/_/g, " ")} on ${a.device_id}`,
+  set_ticket_status: (a) => `Set ${a.ticket_id} to ${a.status}`,
+  resolve_ticket: (a) => `Resolve ${a.ticket_id}`,
+  add_user_to_group: (a) => `Add ${a.user_id} to ${a.group}`,
+  remove_user_from_group: (a) => `Remove ${a.user_id} from ${a.group}`,
+  enable_account: (a) => `Enable ${a.user_id}'s account`,
+  disable_account: (a) => `Disable ${a.user_id}'s account`,
+};
+const label = (tool, args) => { try { return (LABELS[tool] || (() => tool))(args || {}); } catch { return tool; } };
+
+function progress() {
+  const box = el("div", "trace");
+  const status = el("div", "step status");
+  const statusText = el("span");
+  const clock = el("span", "elapsed");
+  status.append(el("span", "icon", "⋯"), statusText, clock);
+  box.appendChild(status);
+  $("log").appendChild(box);
+  const t0 = Date.now();
+  let model = "";
+  const tick = () => { clock.textContent = ` · ${Math.round((Date.now() - t0) / 1000)}s`; };
+  const timer = setInterval(tick, 500); tick();
+  const scroll = () => { $("log").scrollTop = $("log").scrollHeight; };
+  const step = (icon, cls, text, title) => {
+    const s = el("div", "step");
+    const i = el("span", "icon " + cls, icon);
+    const t = el("span", "", text);
+    if (title) s.title = title;
+    s.append(i, t);
+    box.insertBefore(s, status);
+    scroll();
+    return t;
+  };
+  statusText.textContent = "Thinking…";
+  return {
+    event(e) {
+      if (e.type === "thinking") { model = e.model; statusText.textContent = `Thinking… (${model})`; }
+      else if (e.type === "failover") {
+        step("↻", "warn", `${e.from_model} unavailable (${e.code})` + (e.to_model ? `, switching to ${e.to_model}` : ""));
+      } else if (e.type === "approval") {
+        step("✋", "warn", `Approval [${e.risk}]: ${e.plan} · approvers: ${e.approvers.join(", ") || "none"}`);
+      } else if (e.type === "tool") {
+        const r = e.result || {};
+        const txt = step(r.error ? "✕" : "✓", r.error ? "bad" : "ok", label(e.tool, e.args),
+                         `${e.tool}(${Object.values(e.args || {}).join(", ")})`);
+        if (r.error) txt.append(el("span", "bad", ` — ${r.error}${r.reason ? ": " + r.reason : ""}`));
+        const prb = r.outage_problem;
+        if (prb) txt.append(el("span", "warn", prb.new_problem
+          ? ` — outage detected: opened ${prb.problem_id} linking ${prb.linked} tickets`
+          : ` — linked to ongoing outage ${prb.problem_id}`));
+        statusText.textContent = `Thinking… (${model})`;
+      }
+      scroll();
+    },
+    done(seconds, failed) {
+      clearInterval(timer);
+      status.firstChild.textContent = failed ? "✕" : "·";
+      const s = seconds ?? Math.round((Date.now() - t0) / 1000);
+      statusText.textContent = failed ? `Gave up after ${s}s` : `Answered in ${s}s`;
+      clock.textContent = model ? ` with ${model}` : "";
+      if (box.children.length === 1) status.classList.add("status");
+    },
+    fail(msg) { clearInterval(timer); statusText.textContent = msg; status.firstChild.textContent = "✕"; },
+  };
+}
+
+async function streamChat(body, onEvent) {
+  const res = await fetch("/api/chat/stream", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!res.ok || !res.body) {
+    const j = await res.json().catch(() => ({}));
+    if (/unknown session/i.test(j.error || "")) { sessionLost(); throw new Error("session expired"); }
+    throw new Error(j.error || res.statusText);
+  }
+  const reader = res.body.getReader(), dec = new TextDecoder();
+  let buf = "", final = null;
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let nl;
+    while ((nl = buf.indexOf("\n")) >= 0) {
+      const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
+      if (!line) continue;
+      const e = JSON.parse(line);
+      if (e.type === "done") final = e; else onEvent(e);
+    }
+  }
+  if (!final) throw new Error("connection closed before the reply arrived");
+  return final;
+}
+
+// --------------------------------------------------------------- audit list
 async function refreshAudit() {
   const a = await api("/api/audit");
-  $("chain").innerHTML = a.ok ? '<span class="ok">hash chain intact</span>' : `<span class="bad">${a.message}</span>`;
-  $("audit").replaceChildren(...a.entries.reverse().map((e) => {
-    const d = document.createElement("div");
-    d.textContent = `${e.ts.slice(11, 19)} ${e.event} ${e.tool || ""} ${e.verdict || ""} ${e.reason || ""}`;
-    return d;
-  }));
+  $("chain").innerHTML = a.ok ? '<span class="ok">hash chain intact</span>' : `<span class="bad">${esc(a.message)}</span>`;
+  $("audit").replaceChildren(...a.entries.reverse().map((e) =>
+    el("div", "", `${e.ts.slice(11, 19)} ${e.event} ${e.tool || ""} ${e.verdict || ""} ${e.reason || ""}`)));
 }
 
+// -------------------------------------------------------------- session/chat
 $("start").onclick = async () => {
   const r = await api("/api/session", { user: $("user").value, role: $("role").value, incident: $("incident").checked });
   if (r.error) return add("sys", r.error);
-  sid = r.session_id;
-  $("model").textContent = `${$("user").value} · ${$("role").value} · ${r.model}`;
+  sid = r.session_id; role = $("role").value;
+  $("model").textContent = `${$("user").value} · ${role} · ${r.model}`;
   $("msg").disabled = $("go").disabled = false;
   $("undo").disabled = true;
+  $("reset").hidden = role !== "it_admin";
   $("log").replaceChildren();
-  add("sys", `Signed in as ${$("user").value} (${$("role").value}). How can I help?`);
+  add("sys", `Signed in as ${$("user").value} (${role}). How can I help?`);
   $("msg").focus();
 };
 
@@ -188,17 +398,16 @@ $("send").onsubmit = async (e) => {
   $("msg").value = "";
   add("user", text);
   $("go").disabled = true;
-  const wait = add("sys", "working…");
+  const p = progress();
   try {
-    const r = await api("/api/chat", { session_id: sid, message: text, approvers: $("approvers").value });
-    wait.remove();
-    if (r.error) { add("sys", r.error); return; }
-    trace(r.tools, r.approvals);
+    const r = await streamChat({ session_id: sid, message: text, approvers: $("approvers").value }, (ev) => p.event(ev));
+    p.done(r.duration_s != null ? Math.round(r.duration_s) : null,
+           (r.reply || "").startsWith("[the AI service is unavailable"));
     add("bot", r.reply || "(no reply)");
     $("undo").disabled = !r.undo_available;
-    $("model").textContent = `${$("user").value} · ${$("role").value} · ${r.model}`;
+    $("model").textContent = `${$("user").value} · ${role} · ${r.model}`;
   } catch (err) {
-    wait.textContent = "Network error: " + err;
+    p.fail(String(err.message || err));
   } finally {
     $("go").disabled = false;
     refreshAudit();
@@ -218,7 +427,145 @@ document.querySelectorAll(".examples button").forEach((b) => b.onclick = () => {
   $("msg").value = b.textContent;
   $("send").requestSubmit();
 });
-$("refresh").onclick = refreshAudit;
+$("refresh").onclick = (e) => refreshing(e.currentTarget, refreshAudit);
+
+// ------------------------------------------------------------ tickets & KB
+async function loadTickets() {
+  if (!sid) {
+    $("tickets-hint").textContent = "Start a session on the Chat tab to see tickets.";
+    $("tickets").replaceChildren(); $("kb").replaceChildren(); $("kb-hint").textContent = "";
+    return;
+  }
+  const [t, k] = await Promise.all([api(`/api/tickets?session_id=${sid}`), api(`/api/kb?session_id=${sid}`)]);
+  if (t.error || k.error || !t.tickets || !k.articles) {
+    $("tickets-hint").textContent = sid ? `Could not load tickets: ${t.error || k.error}`
+                                        : "Your session expired. Start a session on the Chat tab to see tickets.";
+    $("tickets").replaceChildren(); $("kb").replaceChildren(); $("kb-hint").textContent = "";
+    return;
+  }
+  $("tickets-title").textContent = t.scope === "all" ? "All tickets" : "My tickets";
+  $("tickets-hint").textContent = t.scope === "all"
+    ? "Problem tickets (PRB) are opened automatically when several similar incidents arrive within minutes."
+    : "Tickets you have opened. IT staff see every ticket.";
+  if (!t.tickets.length) $("tickets").replaceChildren(el("div", "empty", "No tickets yet."));
+  else {
+    const rows = t.tickets.map((x) => {
+      const prb = x.kind === "problem";
+      const link = prb ? `links ${x.linked.length}: ${x.linked.join(", ")}` : (x.problem ? `part of ${x.problem}` : "");
+      return `<tr class="${prb ? "problem" : ""}"><td><strong>${esc(x.ticket_id)}</strong>${prb ? ' <span class="badge problem">outage</span>' : ""}</td>
+        <td>${esc(x.title)}${link ? `<div class="hint" style="margin:2px 0 0">${esc(link)}</div>` : ""}</td>
+        <td>${esc(x.priority)}</td><td><span class="badge ${esc(x.status)}">${esc(x.status)}</span></td>
+        <td>${esc(x.requester)}</td><td>${esc(when(x.created_at))}</td></tr>`;
+    }).join("");
+    $("tickets").innerHTML = `<table><thead><tr><th>ID</th><th>Title</th><th>Priority</th><th>Status</th><th>Requester</th><th>Opened</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+
+  const drafts = k.articles.filter((a) => a.status === "draft");
+  $("kb-hint").textContent = k.can_review
+    ? `When the bot resolves a ticket it drafts an article. Drafts stay out of search until IT staff publish them. ${drafts.length} awaiting review.`
+    : "Published articles. IT staff review the drafts the bot writes before they appear here.";
+  const order = { draft: 0, published: 1, rejected: 2 };
+  const arts = [...k.articles].sort((a, b) => order[a.status] - order[b.status]);
+  if (!arts.length) { $("kb").replaceChildren(el("div", "empty", "No articles.")); return; }
+  $("kb").replaceChildren(...arts.map((a) => {
+    const d = el("div", "kb");
+    d.innerHTML = `<div class="toolbar"><strong>${esc(a.kb_id)} · ${esc(a.title)}</strong><span class="spacer"></span>
+      <span class="badge ${a.status === "published" ? "resolved" : a.status === "draft" ? "open" : ""}">${esc(a.status)}</span></div>
+      <p>${esc(a.body)}</p><div class="meta">${a.source ? "from " + esc(a.source) : "seeded"}${a.review_note ? " · note: " + esc(a.review_note) : ""}</div>`;
+    if (k.can_review && a.status === "draft") {
+      const row = el("div", "row");
+      const note = el("input"); note.type = "text"; note.placeholder = "Reviewer note (optional)"; note.style.flex = "1";
+      const pub = el("button", "small", "Publish"), rej = el("button", "secondary small", "Reject");
+      const review = async (decision) => {
+        pub.disabled = rej.disabled = true;
+        const r = await api("/api/kb/review", { session_id: sid, kb_id: a.kb_id, decision, note: note.value });
+        if (r.error) { alert(`${r.error}${r.reason ? ": " + r.reason : ""}`); pub.disabled = rej.disabled = false; }
+        else { loadTickets(); refreshAudit(); }
+      };
+      pub.onclick = () => review("publish"); rej.onclick = () => review("reject");
+      row.append(note, pub, rej);
+      d.appendChild(row);
+    }
+    return d;
+  }));
+}
+$("tickets-refresh").onclick = (e) => refreshing(e.currentTarget, loadTickets);
+
+// ---------------------------------------------------------------- dashboard
+const tip = $("tip");
+function showTip(ev, html) { tip.innerHTML = html; tip.hidden = false; moveTip(ev); }
+function moveTip(ev) {
+  const pad = 12, r = tip.getBoundingClientRect();
+  let x = ev.clientX + pad, y = ev.clientY + pad;
+  if (x + r.width > innerWidth - 8) x = ev.clientX - r.width - pad;
+  if (y + r.height > innerHeight - 8) y = ev.clientY - r.height - pad;
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+}
+
+function kpi(labelText, value, sub) {
+  const d = el("div", "panel kpi");
+  d.append(el("div", "label", labelText), el("div", "value", value), el("div", "sub", sub || ""));
+  return d;
+}
+
+function bars(title, rows, unit, total) {
+  const card = el("section", "panel card");
+  card.appendChild(el("h2", "", title));
+  if (!rows || !rows.length) { card.appendChild(el("div", "empty", "No data yet.")); return card; }
+  const max = Math.max(...rows.map((r) => r.value));
+  const sum = total ?? rows.reduce((a, r) => a + r.value, 0);
+  const list = el("div", "bars");
+  list.setAttribute("role", "list");
+  for (const r of rows) {
+    const row = el("div", "bar-row");
+    row.setAttribute("role", "listitem");
+    row.setAttribute("aria-label", `${r.label}: ${r.value} ${unit}`);
+    const fill = el("div", "fill"); fill.style.width = `${(r.value / max) * 100}%`;
+    const track = el("div", "track"); track.appendChild(fill);
+    row.append(el("span", "name", r.label), el("span", "val", r.value), track);
+    const pct = sum ? Math.round((r.value / sum) * 100) : 0;
+    row.onmouseenter = (ev) => showTip(ev, `<strong>${esc(r.label)}</strong><br>${r.value} ${esc(unit)} · ${pct}% of total`);
+    row.onmousemove = moveTip;
+    row.onmouseleave = () => { tip.hidden = true; };
+    list.appendChild(row);
+  }
+  card.appendChild(list);
+  return card;
+}
+
+async function loadDash() {
+  const s = await api("/api/stats");
+  const k = s.kpis;
+  const pct = (v) => v == null ? "—" : `${Math.round(v * 100)}%`;
+  const secs = (v) => v == null ? "—" : `${v}s`;
+  $("kpis").replaceChildren(
+    kpi("Deflection rate", pct(k.deflection_rate), `${k.self_resolved} of ${k.answered_turns} answered chats self-resolved`),
+    kpi("Median response", secs(k.median_response_s), `p90 ${secs(k.p90_response_s)}`),
+    kpi("Changes made", k.changes_made, `${k.rollbacks} rolled back`),
+    kpi("Policy denials", k.denials, "blocked before running"),
+    kpi("Approvals", k.approvals_granted, `${k.approvals_rejected} rejected`),
+    kpi("Outages detected", k.outages_detected, `${k.open_problems ?? 0} problem ticket(s) open`),
+    kpi("KB drafts to review", k.kb_drafts_pending ?? 0, "on the Tickets & KB tab"),
+    kpi("Model failovers", k.model_failovers, `${k.failed_turns} chat(s) failed`),
+  );
+  $("charts").replaceChildren(
+    bars("Actions by tool", s.actions_by_tool, "actions"),
+    bars("Denials by reason", s.denials_by_reason, "denials"),
+    bars("Tickets by status", s.tickets_by_status, "tickets"),
+    bars("Model failovers by model (code)", s.failovers_by_model, "failovers"),
+    bars("Answered chats by model", s.turns_by_model, "chats"),
+  );
+  $("defs").textContent = `Self-resolved: ${s.definitions.self_resolved}. Deflection rate: ${s.definitions.deflection_rate}. ` +
+    `Sessions: ${k.sessions}. Metrics come from the tamper-evident audit log.`;
+}
+$("dash-refresh").onclick = (e) => refreshing(e.currentTarget, loadDash);
+$("reset").onclick = async () => {
+  if (!confirm("Reset all demo tickets, users and devices to the seeded data?")) return;
+  const r = await api("/api/demo/reset", { session_id: sid });
+  if (r.error) return alert(r.error);
+  loadDash(); refreshAudit();
+};
+
 refreshAudit();
 </script>
 </body>

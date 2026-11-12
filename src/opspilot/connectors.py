@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 
 # --------------------------------------------------------------------- identity
@@ -26,9 +27,25 @@ class MockDirectory:
         "dana": {"name": "Dana Ruiz", "dept": "IT", "manager": None,
                  "locked": False, "enabled": True, "mfa_enrolled": True,
                  "groups": ["it-admins"]},
+        "priya": {"name": "Priya Nair", "dept": "HR", "manager": "dana",
+                  "locked": False, "enabled": True, "mfa_enrolled": False,
+                  "groups": ["hr-users"]},
+        "marco": {"name": "Marco Silva", "dept": "Sales", "manager": "dana",
+                  "locked": False, "enabled": False, "mfa_enrolled": True,
+                  "groups": ["sales-users", "vpn-users"]},
+        "sam": {"name": "Sam Park", "dept": "Engineering", "manager": "dana",
+                "locked": False, "enabled": True, "mfa_enrolled": True,
+                "groups": ["eng-users", "vpn-users"]},
+        "lee": {"name": "Lee Morgan", "dept": "Finance (contractor)", "manager": "alice",
+                "locked": True, "enabled": True, "mfa_enrolled": True,
+                "groups": ["finance-users"]},
+        "jordan": {"name": "Jordan Ellis", "dept": "IT", "manager": "dana",
+                   "locked": False, "enabled": True, "mfa_enrolled": True,
+                   "groups": ["it-support"]},
     })
     groups: set[str] = field(default_factory=lambda: {
-        "finance-users", "vpn-users", "eng-users", "it-admins", "prod-db-readers"})
+        "finance-users", "vpn-users", "eng-users", "it-admins", "prod-db-readers",
+        "hr-users", "sales-users", "it-support"})
     notifications: list[str] = field(default_factory=list)
 
     def _user(self, user_id: str) -> dict:
@@ -82,15 +99,39 @@ class MockTicketing:
                      "priority": "P3", "requester": "bob", "notes": []},
         "INC-1002": {"title": "VPN keeps dropping connection on home wifi", "status": "open",
                      "priority": "P3", "requester": "alice", "notes": []},
+        "INC-1003": {"title": "Account disabled after returning from leave", "status": "open",
+                     "priority": "P3", "requester": "marco", "notes": []},
+        "INC-1004": {"title": "Request VPN access for remote work", "status": "open",
+                     "priority": "P4", "requester": "priya", "notes": []},
     })
-    _seq: int = 1003
+    _seq: int = 1005
+    _prb_seq: int = 1
 
-    def create(self, title: str, description: str, priority: str, requester: str) -> str:
-        tid = f"INC-{self._seq}"
-        self._seq += 1
+    def create(self, title: str, description: str, priority: str, requester: str,
+               kind: str = "incident", now: datetime | None = None) -> str:
+        if kind == "problem":
+            tid = f"PRB-{self._prb_seq:04d}"
+            self._prb_seq += 1
+        else:
+            tid = f"INC-{self._seq}"
+            self._seq += 1
         self.tickets[tid] = {"title": title, "description": description, "status": "open",
-                             "priority": priority, "requester": requester, "notes": []}
+                             "priority": priority, "requester": requester, "notes": [], "kind": kind,
+                             "created_at": (now or datetime.now(timezone.utc)).isoformat()}
+        if kind == "problem":
+            self.tickets[tid]["linked"] = []
         return tid
+
+    def link_to_problem(self, ticket_id: str, problem_id: str) -> None:
+        prb = self.tickets[problem_id]
+        if ticket_id not in prb["linked"]:
+            prb["linked"].append(ticket_id)
+        self.tickets[ticket_id]["problem"] = problem_id
+
+    def list(self, requester: str | None = None) -> list[dict]:
+        rows = [{"ticket_id": tid, **t} for tid, t in self.tickets.items()
+                if requester is None or t["requester"] == requester]
+        return sorted(rows, key=lambda r: r.get("created_at", ""), reverse=True)
 
     def get(self, ticket_id: str) -> dict:
         if ticket_id not in self.tickets:
@@ -143,6 +184,21 @@ class MockEndpoints:
         "LT-BOB-07": {"owner": "bob", "os": "macOS 15", "disk_free_gb": 88.0,
                       "cpu_pct": 12, "days_since_patch": 3, "firewall": False,
                       "services": {"vpn_client": "degraded"}},
+        "LT-PRIYA-02": {"owner": "priya", "os": "Windows 11", "disk_free_gb": 54.0,
+                        "cpu_pct": 18, "days_since_patch": 64, "firewall": True,
+                        "services": {"vpn_client": "running"}},
+        "LT-MARCO-05": {"owner": "marco", "os": "macOS 15", "disk_free_gb": 120.0,
+                        "cpu_pct": 9, "days_since_patch": 52, "firewall": True,
+                        "services": {"vpn_client": "running"}},
+        "LT-SAM-03": {"owner": "sam", "os": "Windows 11", "disk_free_gb": 31.0,
+                      "cpu_pct": 91, "days_since_patch": 12, "firewall": False,
+                      "services": {"print_spooler": "stopped", "vpn_client": "running"}},
+        "LT-LEE-09": {"owner": "lee", "os": "Windows 11", "disk_free_gb": 3.4,
+                      "cpu_pct": 22, "days_since_patch": 8, "firewall": True,
+                      "services": {"vpn_client": "running"}},
+        "LT-JORDAN-04": {"owner": "jordan", "os": "Ubuntu 24.04", "disk_free_gb": 210.0,
+                         "cpu_pct": 15, "days_since_patch": 2, "firewall": True,
+                         "services": {"vpn_client": "running"}},
     })
 
     def health(self, device_id: str) -> dict:
@@ -187,6 +243,9 @@ class MockMonitoring:
     alerts: list[dict] = field(default_factory=lambda: [
         {"id": "ALR-77", "device_id": "LT-ALICE-01", "signal": "disk_free_gb < 5", "severity": "warning"},
         {"id": "ALR-78", "device_id": "LT-BOB-07", "signal": "vpn_client degraded", "severity": "warning"},
+        {"id": "ALR-79", "device_id": "LT-SAM-03", "signal": "firewall disabled", "severity": "critical"},
+        {"id": "ALR-80", "device_id": "LT-SAM-03", "signal": "cpu_pct > 90 for 15m", "severity": "warning"},
+        {"id": "ALR-81", "device_id": "LT-LEE-09", "signal": "disk_free_gb < 5", "severity": "warning"},
     ])
 
     def active(self) -> list[dict]:
@@ -203,6 +262,14 @@ class MockKnowledgeBase:
         "KB-19": {"title": "Printer jobs stuck in queue",
                   "body": "Restart the print spooler service, then resend the job.",
                   "status": "published"},
+        "KB-23": {"title": "Set up MFA (multi-factor authentication)",
+                  "body": "Install the authenticator app, then sign in at the MFA setup page with your work "
+                          "account and scan the QR code. IT never asks for your codes.",
+                  "status": "published"},
+        "KB-31": {"title": "Returning from leave: account disabled",
+                  "body": "Accounts are disabled after 30 days of leave. IT staff re-enable them after "
+                          "your manager confirms your return.",
+                  "status": "published"},
     })
     _seq: int = 100
 
@@ -210,6 +277,8 @@ class MockKnowledgeBase:
         q = _tokens(query)
         hits = []
         for kid, a in self.articles.items():
+            if a["status"] != "published":
+                continue
             score = len(q & _tokens(a["title"] + " " + a["body"]))
             if score:
                 hits.append((score, {"kb_id": kid, "title": a["title"], "body": a["body"]}))
@@ -220,6 +289,21 @@ class MockKnowledgeBase:
         self._seq += 1
         self.articles[kid] = {"title": title, "body": body, "status": "draft", "source": source_ticket}
         return kid
+
+    def list(self, status: str | None = None) -> list[dict]:
+        return [{"kb_id": k, **a} for k, a in self.articles.items() if status is None or a["status"] == status]
+
+    def review(self, kb_id: str, publish: bool, note: str = "") -> dict:
+        """Human review of a drafted article: publish it (searchable) or reject it."""
+        if kb_id not in self.articles:
+            raise KeyError(f"no such article '{kb_id}'")
+        a = self.articles[kb_id]
+        if a["status"] != "draft":
+            raise ValueError(f"{kb_id} is already {a['status']}")
+        a["status"] = "published" if publish else "rejected"
+        if note:
+            a["review_note"] = note
+        return {"kb_id": kb_id, "status": a["status"]}
 
 
 @dataclass
