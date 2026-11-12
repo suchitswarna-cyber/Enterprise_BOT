@@ -27,9 +27,25 @@ class MockDirectory:
         "dana": {"name": "Dana Ruiz", "dept": "IT", "manager": None,
                  "locked": False, "enabled": True, "mfa_enrolled": True,
                  "groups": ["it-admins"]},
+        "priya": {"name": "Priya Nair", "dept": "HR", "manager": "dana",
+                  "locked": False, "enabled": True, "mfa_enrolled": False,
+                  "groups": ["hr-users"]},
+        "marco": {"name": "Marco Silva", "dept": "Sales", "manager": "dana",
+                  "locked": False, "enabled": False, "mfa_enrolled": True,
+                  "groups": ["sales-users", "vpn-users"]},
+        "sam": {"name": "Sam Park", "dept": "Engineering", "manager": "dana",
+                "locked": False, "enabled": True, "mfa_enrolled": True,
+                "groups": ["eng-users", "vpn-users"]},
+        "lee": {"name": "Lee Morgan", "dept": "Finance (contractor)", "manager": "alice",
+                "locked": True, "enabled": True, "mfa_enrolled": True,
+                "groups": ["finance-users"]},
+        "jordan": {"name": "Jordan Ellis", "dept": "IT", "manager": "dana",
+                   "locked": False, "enabled": True, "mfa_enrolled": True,
+                   "groups": ["it-support"]},
     })
     groups: set[str] = field(default_factory=lambda: {
-        "finance-users", "vpn-users", "eng-users", "it-admins", "prod-db-readers"})
+        "finance-users", "vpn-users", "eng-users", "it-admins", "prod-db-readers",
+        "hr-users", "sales-users", "it-support"})
     notifications: list[str] = field(default_factory=list)
 
     def _user(self, user_id: str) -> dict:
@@ -83,8 +99,12 @@ class MockTicketing:
                      "priority": "P3", "requester": "bob", "notes": []},
         "INC-1002": {"title": "VPN keeps dropping connection on home wifi", "status": "open",
                      "priority": "P3", "requester": "alice", "notes": []},
+        "INC-1003": {"title": "Account disabled after returning from leave", "status": "open",
+                     "priority": "P3", "requester": "marco", "notes": []},
+        "INC-1004": {"title": "Request VPN access for remote work", "status": "open",
+                     "priority": "P4", "requester": "priya", "notes": []},
     })
-    _seq: int = 1003
+    _seq: int = 1005
     _prb_seq: int = 1
 
     def create(self, title: str, description: str, priority: str, requester: str,
@@ -164,6 +184,21 @@ class MockEndpoints:
         "LT-BOB-07": {"owner": "bob", "os": "macOS 15", "disk_free_gb": 88.0,
                       "cpu_pct": 12, "days_since_patch": 3, "firewall": False,
                       "services": {"vpn_client": "degraded"}},
+        "LT-PRIYA-02": {"owner": "priya", "os": "Windows 11", "disk_free_gb": 54.0,
+                        "cpu_pct": 18, "days_since_patch": 64, "firewall": True,
+                        "services": {"vpn_client": "running"}},
+        "LT-MARCO-05": {"owner": "marco", "os": "macOS 15", "disk_free_gb": 120.0,
+                        "cpu_pct": 9, "days_since_patch": 52, "firewall": True,
+                        "services": {"vpn_client": "running"}},
+        "LT-SAM-03": {"owner": "sam", "os": "Windows 11", "disk_free_gb": 31.0,
+                      "cpu_pct": 91, "days_since_patch": 12, "firewall": False,
+                      "services": {"print_spooler": "stopped", "vpn_client": "running"}},
+        "LT-LEE-09": {"owner": "lee", "os": "Windows 11", "disk_free_gb": 3.4,
+                      "cpu_pct": 22, "days_since_patch": 8, "firewall": True,
+                      "services": {"vpn_client": "running"}},
+        "LT-JORDAN-04": {"owner": "jordan", "os": "Ubuntu 24.04", "disk_free_gb": 210.0,
+                         "cpu_pct": 15, "days_since_patch": 2, "firewall": True,
+                         "services": {"vpn_client": "running"}},
     })
 
     def health(self, device_id: str) -> dict:
@@ -208,6 +243,9 @@ class MockMonitoring:
     alerts: list[dict] = field(default_factory=lambda: [
         {"id": "ALR-77", "device_id": "LT-ALICE-01", "signal": "disk_free_gb < 5", "severity": "warning"},
         {"id": "ALR-78", "device_id": "LT-BOB-07", "signal": "vpn_client degraded", "severity": "warning"},
+        {"id": "ALR-79", "device_id": "LT-SAM-03", "signal": "firewall disabled", "severity": "critical"},
+        {"id": "ALR-80", "device_id": "LT-SAM-03", "signal": "cpu_pct > 90 for 15m", "severity": "warning"},
+        {"id": "ALR-81", "device_id": "LT-LEE-09", "signal": "disk_free_gb < 5", "severity": "warning"},
     ])
 
     def active(self) -> list[dict]:
@@ -223,6 +261,14 @@ class MockKnowledgeBase:
                   "status": "published"},
         "KB-19": {"title": "Printer jobs stuck in queue",
                   "body": "Restart the print spooler service, then resend the job.",
+                  "status": "published"},
+        "KB-23": {"title": "Set up MFA (multi-factor authentication)",
+                  "body": "Install the authenticator app, then sign in at the MFA setup page with your work "
+                          "account and scan the QR code. IT never asks for your codes.",
+                  "status": "published"},
+        "KB-31": {"title": "Returning from leave: account disabled",
+                  "body": "Accounts are disabled after 30 days of leave. IT staff re-enable them after "
+                          "your manager confirms your return.",
                   "status": "published"},
     })
     _seq: int = 100
